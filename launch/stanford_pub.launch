@@ -1,0 +1,11 @@
+<launch>
+  <node name="mesh_publisher" pkg="stanford_dataset" type="mesh_publisher" output="screen" args="">
+
+    <!-- Parameters for the human segmentations -->
+    <rosparam param="areas"> ["area_3"] </rosparam>
+
+    <!-- Parameters for bounding box and focal length -->
+    <param name="verbose" value="true"/>
+    <param name="dataset_path" value="/home/argupta/Datasets/2D-3D-Semantics"/>
+  </node>
+</launch>
