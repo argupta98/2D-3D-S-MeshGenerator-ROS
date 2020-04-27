@@ -106,7 +106,7 @@ class StanfordDepthPublisher(object):
             data=data
         )
     
-    def pose_to_tf(self, camera_ext):
+    def pose_to_tf(self, camera_ext, stamp):
         inv_R = camera_ext[:3, :3].T
         inv_t = -np.matmul(inv_R, camera_ext[:3, 3])
 
@@ -117,7 +117,7 @@ class StanfordDepthPublisher(object):
         pose_msg = TransformStamped()
         pose_msg.header.frame_id = self.world_frame
         pose_msg.child_frame_id = self.camera_frame
-        pose_msg.header.stamp = rospy.Time.now()
+        pose_msg.header.stamp = stamp
         quat = quaternion_from_matrix(inv_R)
         pose_msg.transform.rotation.x = quat[0]
         pose_msg.transform.rotation.y = quat[1]
@@ -128,11 +128,20 @@ class StanfordDepthPublisher(object):
         pose_msg.transform.translation.z = inv_t[2]
         return pose_msg
     
-    def build_caminfo(self, camera_intrinsics):
+    def build_caminfo(self, camera_intrinsics, stamp):
         msg = CameraInfo()
-        msg.header.stamp = rospy.Time.now()
+        msg.header.stamp = stamp
         msg.header.frame_id = self.camera_frame
         msg.K = list(camera_intrinsics.flatten())
+        return msg
+    
+    def build_image(self, image, stamp, img_type=None):
+        if img_type is None:
+            msg = self.bridge.cv2_to_imgmsg(image)
+        else:
+            msg = self.bridge.cv2_to_imgmsg(image, img_type)
+        msg.header.stamp = stamp
+        msg.header.frame_id = self.camera_frame
         return msg
 
     def publish_dataset(self):
@@ -161,22 +170,23 @@ class StanfordDepthPublisher(object):
                 
                 depth_path = os.path.join(depth_dir, img_path[img_path.rfind('/') + 1:img_path.rfind('_')] + '_depth.png')
 
-                depth_img = cv2.imread(depth_path, -cv2.IMREAD_ANYDEPTH) / 512.
+                depth_img = cv2.imread(depth_path, -cv2.IMREAD_ANYDEPTH)/512.
                 if depth_img is None:
                     print("Depth Img: {} does not exist!".format(depth_path))
 
                 camera_pose = np.array(pose["camera_rt_matrix"])
                 camera_K = np.array(pose["camera_k_matrix"])
 
+                stamp = rospy.Time.now()
                 # 3) publish tf transform for the pose
-                self.pose_publisher.publish(self.pose_to_tf(camera_pose))
+                self.pose_publisher.publish(self.pose_to_tf(camera_pose, stamp))
 
                 # 4) publish the camera parameters
-                self.cam_info_publisher.publish(self.build_caminfo(camera_K))
+                self.cam_info_publisher.publish(self.build_caminfo(camera_K, stamp))
 
                 # 5) publish depth and rgb images
-                self.image_publisher.publish(self.bridge.cv2_to_imgmsg(img, "bgr8"))
-                self.depth_publisher.publish(self.bridge.cv2_to_imgmsg(depth_img))
+                self.image_publisher.publish(self.build_image(img, stamp, img_type="bgr8"))
+                self.depth_publisher.publish(self.build_image(depth_img.astype(np.float32), stamp))
                 self.rate.sleep()
 
 

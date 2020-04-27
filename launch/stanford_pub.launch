@@ -4,7 +4,7 @@
   <arg name="cam_info_topic"     default="rgb/cam_info"/>
   <arg name="rgb_image_topic"    default="rgb/image_rect"/>
   <arg name="depth_image_topic"  default="depth_registered/image_rect"/>
-  <arg name="transform_topic"    default="rgb/cam_tranform"/>
+  <arg name="transform_topic"    default="rgb/cam_transform"/>
   <arg name="pointcloud_topic"   default="depth_registered/points"/>
   <arg name="camera_frame"       default="camera"/>
   <arg name="voxel_size"         default="0.05"/>
@@ -32,10 +32,14 @@
     <param name="mesh_filename" value="$(arg mesh_output_path)/$(arg area)_voxblox_mesh.ply" />
   </node>
 
+  <!-- Nodelet Manger for depth_image_proc--> 
+  <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager"
+      output="screen"/>
+
   <!-- Node to convert from depth image to point cloud -->
   <node pkg="nodelet" type="nodelet" name="cloudify"
       args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager
-      -no-bond" output="screen">
+      --no-bond" output="screen">
       <!-- Input -->
       <remap from="rgb/camera_info"             to="$(arg cam_info_topic)"/>
       <remap from="rgb/image_rect_color"        to="$(arg rgb_image_topic)"/>
