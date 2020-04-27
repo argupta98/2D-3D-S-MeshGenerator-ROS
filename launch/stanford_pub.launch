@@ -1,11 +1,62 @@
 <launch>
-  <node name="mesh_publisher" pkg="stanford_dataset" type="mesh_publisher" output="screen" args="">
+  <!-- Global args -->
+  <arg name="area"               default="area_1"/>
+  <arg name="cam_info_topic"     default="rgb/cam_info"/>
+  <arg name="rgb_image_topic"    default="rgb/image_rect"/>
+  <arg name="depth_image_topic"  default="depth_registered/image_rect"/>
+  <arg name="transform_topic"    default="rgb/cam_tranform"/>
+  <arg name="pointcloud_topic"   default="depth_registered/points"/>
+  <arg name="camera_frame"       default="camera"/>
+  <arg name="voxel_size"         default="0.05"/>
+  <arg name="world_frame"        default="world"/>
 
-    <!-- Parameters for the human segmentations -->
-    <rosparam param="areas"> ["area_3"] </rosparam>
-
-    <!-- Parameters for bounding box and focal length -->
-    <param name="verbose" value="true"/>
-    <param name="dataset_path" value="/home/argupta/Datasets/2D-3D-Semantics"/>
+  <!-- THIS MUST BE FILLED IN AS YOUR OUTPUT PATH -->
+  <arg name="mesh_output_path"   default="/home/argupta/MeshVerification/preprocessed"/>
+ 
+  <!-- Voxblox Mesh Building Node -->
+  <node name="voxblox_node" pkg="voxblox_ros" type="tsdf_server" output="screen" args="-alsologtostderr" clear_params="true">
+    <remap from="pointcloud" to="$(arg pointcloud_topic)"/>
+    <param name="tsdf_voxel_size" value="$(arg voxel_size)" />
+    <param name="tsdf_voxels_per_side" value="32" />
+    <param name="voxel_carving_enabled" value="true" />
+    <param name="color_mode" value="color" />
+    <param name="use_tf_transforms" value="false" />
+    <param name="update_mesh_every_n_sec" value="1.0" />
+    <param name="min_time_between_msgs_sec" value="0.0" />
+    <param name="method" value="fast" />
+    <param name="use_const_weight" value="false" />
+    <param name="allow_clear" value="true" />
+    <param name="verbose" value="true" />
+    <remap from="transform" to="$(arg transform_topic)" />
+    <!--rosparam file="$(find voxblox_ros)/cfg/stanford_dataset.yaml"/-->
+    <param name="mesh_filename" value="$(arg mesh_output_path)/$(arg area)_voxblox_mesh.ply" />
   </node>
+
+  <!-- Node to convert from depth image to point cloud -->
+  <node pkg="nodelet" type="nodelet" name="cloudify"
+      args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager
+      -no-bond" output="screen">
+      <!-- Input -->
+      <remap from="rgb/camera_info"             to="$(arg cam_info_topic)"/>
+      <remap from="rgb/image_rect_color"        to="$(arg rgb_image_topic)"/>
+      <remap from="depth_registered/image_rect" to="$(arg depth_image_topic)"/>
+      <!-- Output -->
+      <remap from="depth_registered/points"     to="$(arg pointcloud_topic)"/>
+      <!-- Params -->
+      <param name="queue_size" value="20"/>
+  </node>
+
+  <!-- Node to publish the stanford dataset depth image data-->
+  <node name="mesh_publisher" pkg="stanford_dataset" type="mesh_publisher" output="screen" args="">
+    <param name="areas"            value="$(arg area)"/>
+    <param name="camera_topic"    value="$(arg cam_info_topic)" />
+    <param name="camera_tf_frame" value="$(arg camera_frame)" />
+    <param name="world_tf_frame"  value="$(arg world_frame)" />
+    <param name="transform"       value="$(arg transform_topic)" />
+    <param name="image_topic"     value="$(arg rgb_image_topic)" />
+    <param name="depth_topic"     value="$(arg depth_image_topic)" />
+    <param name="dataset_path"    value="/home/argupta/Datasets/2D-3D-Semantics"/>
+    <param name="verbose"         value="true"/>
+  </node>
+
 </launch>
