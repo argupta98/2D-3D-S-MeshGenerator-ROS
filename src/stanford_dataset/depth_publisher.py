@@ -36,13 +36,14 @@ class StanfordDepthPublisher(object):
         transform_topic = rospy.get_param("~transform")
         image_topic = rospy.get_param("~image_topic")
         depth_topic = rospy.get_param("~depth_topic")
-        self.rate = rospy.Rate(2)
+        self.rate = rospy.Rate(15)
 
         self.bridge = CvBridge()
         self.pose_publisher = rospy.Publisher(transform_topic, TransformStamped, queue_size=10)
         self.cam_info_publisher = rospy.Publisher(camera_topic, CameraInfo, queue_size=10)
         self.image_publisher = rospy.Publisher(image_topic, Image, queue_size=10)
         self.depth_publisher = rospy.Publisher(depth_topic, Image, queue_size=10)
+        self.seq_id = 0
 
 
     def depth_image_to_pointcloud(self, image, depth_image, camera_K):
@@ -132,7 +133,15 @@ class StanfordDepthPublisher(object):
         msg = CameraInfo()
         msg.header.stamp = stamp
         msg.header.frame_id = self.camera_frame
+        # msg.header.seq = self.seq_id
+        # msg.distortion_model = "plumb_bob"
         msg.K = list(camera_intrinsics.flatten())
+        projection = np.concatenate([camera_intrinsics, np.zeros((3, 1))], axis=1)
+        msg.P = list(projection.flatten())
+        # msg.R = list(np.eye(3).flatten())
+        # msg.D = [0.0, 0.0, 0.0, 0.0, 0.0]
+        # msg.height = 1080
+        # msg.width = 1080
         return msg
     
     def build_image(self, image, stamp, img_type=None):
@@ -140,8 +149,11 @@ class StanfordDepthPublisher(object):
             msg = self.bridge.cv2_to_imgmsg(image)
         else:
             msg = self.bridge.cv2_to_imgmsg(image, img_type)
+        msg.header.seq = self.seq_id
         msg.header.stamp = stamp
         msg.header.frame_id = self.camera_frame
+        msg.height = image.shape[0]
+        msg.width = image.shape[1]
         return msg
 
     def publish_dataset(self):
@@ -173,6 +185,9 @@ class StanfordDepthPublisher(object):
                 depth_img = cv2.imread(depth_path, -cv2.IMREAD_ANYDEPTH)/512.
                 if depth_img is None:
                     print("Depth Img: {} does not exist!".format(depth_path))
+                
+                depth_img_float = depth_img.astype(np.float32)
+                assert(depth_img_float[0,0] == depth_img[0,0]), "depth_img_float: {}  depth_img: {}".format(depth_img_float[0,0], depth_img[0,0])
 
                 camera_pose = np.array(pose["camera_rt_matrix"])
                 camera_K = np.array(pose["camera_k_matrix"])
@@ -187,7 +202,9 @@ class StanfordDepthPublisher(object):
                 # 5) publish depth and rgb images
                 self.image_publisher.publish(self.build_image(img, stamp, img_type="bgr8"))
                 self.depth_publisher.publish(self.build_image(depth_img.astype(np.float32), stamp))
+                self.seq_id += 1
                 self.rate.sleep()
+
 
 
 def main():

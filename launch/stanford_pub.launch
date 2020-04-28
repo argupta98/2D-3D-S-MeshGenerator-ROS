@@ -1,14 +1,14 @@
 <launch>
   <!-- Global args -->
-  <arg name="area"               default="area_1"/>
-  <arg name="cam_info_topic"     default="rgb/cam_info"/>
-  <arg name="rgb_image_topic"    default="rgb/image_rect"/>
-  <arg name="depth_image_topic"  default="depth_registered/image_rect"/>
-  <arg name="transform_topic"    default="rgb/cam_transform"/>
-  <arg name="pointcloud_topic"   default="depth_registered/points"/>
-  <arg name="camera_frame"       default="camera"/>
-  <arg name="voxel_size"         default="0.05"/>
-  <arg name="world_frame"        default="world"/>
+  <arg name="area"                     default="area_1"/>
+  <arg name="cam_info_topic"           default="rgb/cam_info"/>
+  <arg name="rgb_image_topic"          default="rgb/image_rect"/>
+  <arg name="depth_image_topic"        default="depth_registered/image_rect"/>
+  <arg name="transform_topic"          default="rgb/cam_transform"/>
+  <arg name="pointcloud_topic"         default="depth_registered/points"/>
+  <arg name="camera_frame"             default="/camera"/>
+  <arg name="voxel_size"               default="0.05"/>
+  <arg name="world_frame"              default="/world"/>
 
   <!-- THIS MUST BE FILLED IN AS YOUR OUTPUT PATH -->
   <arg name="mesh_output_path"   default="/home/argupta/MeshVerification/preprocessed"/>

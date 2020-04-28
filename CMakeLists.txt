@@ -9,7 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
 )
 catkin_python_setup()
 catkin_simple()
-cs_install_scripts(scripts/mesh_publisher)
+cs_install_scripts(scripts/mesh_publisher
+                   scripts/pointcloud_subscriber)
 
 
 cs_export()
