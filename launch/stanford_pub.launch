@@ -34,25 +34,25 @@
     <param name="mesh_filename" value="$(arg mesh_output_path)/$(arg area)_voxblox_mesh.ply" unless="$(arg noisy)"/>
     <param name="mesh_filename" value="$(arg mesh_output_path)/$(arg area)_voxblox_mesh_noisy.ply" if="$(arg noisy)"/>
   </node>
-
-<!-- Nodelet Manger for depth_image_proc--> 
-<node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager"
-    output="screen"/>
-
-<!-- Node to convert from depth image to point cloud -->
-<node pkg="nodelet" type="nodelet" name="cloudify"
-    args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager
-    --no-bond" output="screen">
-    <!-- Input -->
-    <remap from="rgb/camera_info"             to="$(arg cam_info_topic)"/>
-    <remap from="rgb/image_rect_color"        to="$(arg rgb_image_topic)"/>
-    <remap from="depth_registered/image_rect" to="$(arg depth_image_topic)"/>
-    <!-- Output -->
-    <remap from="depth_registered/points"     to="$(arg pointcloud_topic)"/>
-    <!-- Params -->
-    <param name="queue_size" value="20"/>
-</node>
-
+  
+  <!-- Nodelet Manger for depth_image_proc--> 
+  <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager"
+      output="screen"/>
+ 
+  <!-- Node to convert from depth image to point cloud -->
+  <node pkg="nodelet" type="nodelet" name="cloudify"
+      args="load depth_image_proc/point_cloud_xyzrgb nodelet_manager
+      --no-bond" output="screen">
+      <!-- Input -->
+      <remap from="rgb/camera_info"             to="$(arg cam_info_topic)"/>
+      <remap from="rgb/image_rect_color"        to="$(arg rgb_image_topic)"/>
+      <remap from="depth_registered/image_rect" to="$(arg depth_image_topic)"/>
+      <!-- Output -->
+      <remap from="depth_registered/points"     to="$(arg pointcloud_topic)"/>
+      <!-- Params -->
+      <param name="queue_size" value="20"/>
+  </node>
+ 
   <!-- Node to publish the stanford dataset depth image data-->
   <node name="mesh_publisher" pkg="stanford_dataset" type="mesh_publisher" output="screen" args="">
     <param name="areas"             value="$(arg area)"/>
