@@ -21,6 +21,7 @@ from tf.transformations import quaternion_from_matrix, rotation_matrix
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 from tqdm import tqdm
+from transforms3d.euler import euler2mat, mat2euler
 
 class StanfordDepthPublisher(object):
     """Reads in stanford dataset items and publishes the data to be turned into a Mesh."""
@@ -32,17 +33,24 @@ class StanfordDepthPublisher(object):
         print("processing area: {}".format(self.areas_to_process))
         self.camera_frame = rospy.get_param("~camera_tf_frame")
         self.world_frame = rospy.get_param("~world_tf_frame")
+        self.make_pointcloud = rospy.get_param("~make_pointcloud")
+        self.noisy = rospy.get_param("~noisy")
+        self.translation_noise = rospy.get_param("~translation_noise")
+        self.rotation_noise = rospy.get_param("~rotation_noise")
         camera_topic = rospy.get_param("~camera_topic")
         transform_topic = rospy.get_param("~transform")
         image_topic = rospy.get_param("~image_topic")
         depth_topic = rospy.get_param("~depth_topic")
-        self.rate = rospy.Rate(15)
+        pointcloud_topic = rospy.get_param("~pointcloud_topic")
+        self.rate = rospy.Rate(10)
 
         self.bridge = CvBridge()
         self.pose_publisher = rospy.Publisher(transform_topic, TransformStamped, queue_size=10)
         self.cam_info_publisher = rospy.Publisher(camera_topic, CameraInfo, queue_size=10)
         self.image_publisher = rospy.Publisher(image_topic, Image, queue_size=10)
         self.depth_publisher = rospy.Publisher(depth_topic, Image, queue_size=10)
+        if self.make_pointcloud:
+            self.pointcloud_publisher = rospy.Publisher(pointcloud_topic, PointCloud2)
         self.seq_id = 0
 
 
@@ -75,7 +83,7 @@ class StanfordDepthPublisher(object):
 
         return xyz_rgb
 
-    def point_cloud_msg(self, points):
+    def point_cloud_msg(self, points, stamp):
         """ Creates a point cloud message.
         Args:
             points: Nx6 array of xyz positions (m) and rgb colors (0..1)
@@ -93,7 +101,7 @@ class StanfordDepthPublisher(object):
             name=n, offset=i*itemsize, datatype=ros_dtype, count=1)
             for i, n in enumerate('xyzrgb')]
 
-        header = Header(frame_id="camera_frame", stamp=rospy.Time.now())
+        header = Header(frame_id="camera_frame", stamp=stamp)
 
         return PointCloud2(
             header=header,
@@ -110,6 +118,16 @@ class StanfordDepthPublisher(object):
     def pose_to_tf(self, camera_ext, stamp):
         inv_R = camera_ext[:3, :3].T
         inv_t = -np.matmul(inv_R, camera_ext[:3, 3])
+
+        if self.noisy:
+            # Translation noise
+            t_noise = np.random.normal(loc=0.0, scale=self.translation_noise, size=(3))
+            inv_t += t_noise
+
+            # Rotation noise
+            euler_angles = np.array(mat2euler(inv_R))
+            euler_angles += np.random.normal(loc=0.0, scale=self.rotation_noise, size=(3))
+            inv_R = euler2mat(*euler_angles)
 
         # 4x4 homogeneous rotation
         inv_R = np.concatenate([inv_R, np.zeros((3, 1))], axis=1)
@@ -193,13 +211,20 @@ class StanfordDepthPublisher(object):
                 camera_K = np.array(pose["camera_k_matrix"])
 
                 stamp = rospy.Time.now()
-                # 3) publish tf transform for the pose
+
+                if self.make_pointcloud:
+                    pointcloud = self.depth_image_to_pointcloud(img, depth_img, camera_K)
+                    msg = self.point_cloud_msg(pointcloud, stamp)
+                    self.pointcloud_publisher.publish(msg)
+
+
+                # publish tf transform for the pose
                 self.pose_publisher.publish(self.pose_to_tf(camera_pose, stamp))
 
-                # 4) publish the camera parameters
+                # publish the camera parameters
                 self.cam_info_publisher.publish(self.build_caminfo(camera_K, stamp))
 
-                # 5) publish depth and rgb images
+                # publish depth and rgb images
                 self.image_publisher.publish(self.build_image(img, stamp, img_type="bgr8"))
                 self.depth_publisher.publish(self.build_image(depth_img.astype(np.float32), stamp))
                 self.seq_id += 1
